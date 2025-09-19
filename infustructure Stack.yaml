@@ -1,0 +1,5 @@
+Container Orchestration: Kubernetes (EKS/GKE/AKS)
+Load Balancing: NGINX + cloud load balancers
+Monitoring: Prometheus + Grafana
+Logging: ELK Stack (Elasticsearch, Logstash, Kibana)
+CI/CD: GitLab CI or GitHub Actions

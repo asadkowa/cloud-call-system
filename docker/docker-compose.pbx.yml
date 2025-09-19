@@ -1,0 +1,191 @@
+version: '3.8'
+
+services:
+  # PBX Node 1 (Primary)
+  pbx-node-1:
+    build:
+      context: ./pbx
+      dockerfile: Dockerfile
+    container_name: cloudcall-pbx-1
+    hostname: pbx-1.cloudcall.local
+    networks:
+      - pbx-cluster
+      - backend-network
+    ports:
+      - "5060:5060/udp"    # SIP
+      - "5060:5060/tcp"    # SIP TCP
+      - "8021:8021/tcp"    # Event Socket Library
+      - "10000-10100:10000-10100/udp"  # RTP Range for Node 1
+    volumes:
+      - pbx-1-recordings:/var/lib/freeswitch/recordings
+      - pbx-1-storage:/var/lib/freeswitch/storage
+      - pbx-1-logs:/var/log/freeswitch
+      - ./pbx/config:/etc/freeswitch
+    environment:
+      - FS_NODE_ID=1
+      - FS_CLUSTER_ROLE=primary
+      - FS_DOMAIN=cloudcall.local
+      - FS_PASSWORD=CloudCall123!
+      - FS_ESL_PASSWORD=ClueCon
+      - FS_RTP_START=10000
+      - FS_RTP_END=10100
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "fs_cli", "-x", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # PBX Node 2 (Secondary)
+  pbx-node-2:
+    build:
+      context: ./pbx
+      dockerfile: Dockerfile
+    container_name: cloudcall-pbx-2
+    hostname: pbx-2.cloudcall.local
+    networks:
+      - pbx-cluster
+      - backend-network
+    ports:
+      - "5061:5060/udp"    # SIP (alternative port)
+      - "5062:5060/tcp"    # SIP TCP (alternative port)
+      - "8022:8021/tcp"    # Event Socket Library (alternative port)
+      - "10101-10200:10000-10100/udp"  # RTP Range for Node 2
+    volumes:
+      - pbx-2-recordings:/var/lib/freeswitch/recordings
+      - pbx-2-storage:/var/lib/freeswitch/storage
+      - pbx-2-logs:/var/log/freeswitch
+      - ./pbx/config:/etc/freeswitch
+    environment:
+      - FS_NODE_ID=2
+      - FS_CLUSTER_ROLE=secondary
+      - FS_DOMAIN=cloudcall.local
+      - FS_PASSWORD=CloudCall123!
+      - FS_ESL_PASSWORD=ClueCon
+      - FS_RTP_START=10101
+      - FS_RTP_END=10200
+      - FS_PRIMARY_NODE=pbx-node-1
+    restart: unless-stopped
+    depends_on:
+      - pbx-node-1
+    healthcheck:
+      test: ["CMD", "fs_cli", "-x", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Session Border Controller (SBC)
+  sbc:
+    image: kamailio/kamailio:5.6-alpine
+    container_name: cloudcall-sbc
+    hostname: sbc.cloudcall.local
+    networks:
+      - pbx-cluster
+      - external-network
+    ports:
+      - "5063:5060/udp"    # External SIP
+      - "5064:5060/tcp"    # External SIP TCP
+      - "20000-20100:20000-20100/udp"  # RTP for SBC
+    volumes:
+      - ./sbc/kamailio.cfg:/etc/kamailio/kamailio.cfg
+      - sbc-logs:/var/log/kamailio
+    environment:
+      - SBC_DOMAIN=cloudcall.local
+      - SBC_LISTEN_IP=0.0.0.0
+      - SBC_LISTEN_PORT=5060
+      - PBX_NODE_1=pbx-node-1:5060
+      - PBX_NODE_2=pbx-node-2:5060
+    restart: unless-stopped
+    depends_on:
+      - pbx-node-1
+      - pbx-node-2
+
+  # Redis for PBX clustering and session management
+  redis-pbx:
+    image: redis:7-alpine
+    container_name: cloudcall-redis-pbx
+    hostname: redis-pbx.cloudcall.local
+    networks:
+      - pbx-cluster
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis-pbx-data:/data
+    command: redis-server --appendonly yes --requirepass CloudCallRedis123!
+    restart: unless-stopped
+
+  # Media Server for recording and conferencing
+  media-server:
+    build:
+      context: ./media
+      dockerfile: Dockerfile
+    container_name: cloudcall-media
+    hostname: media.cloudcall.local
+    networks:
+      - pbx-cluster
+    ports:
+      - "8080:8080"       # HTTP API
+      - "30000-30100:30000-30100/udp"  # RTP for media processing
+    volumes:
+      - media-recordings:/var/recordings
+      - media-storage:/var/storage
+    environment:
+      - MEDIA_DOMAIN=cloudcall.local
+      - MEDIA_RTP_START=30000
+      - MEDIA_RTP_END=30100
+      - REDIS_URL=redis://CloudCallRedis123!@redis-pbx:6379
+    restart: unless-stopped
+    depends_on:
+      - redis-pbx
+
+  # PBX Load Balancer
+  pbx-lb:
+    image: nginx:alpine
+    container_name: cloudcall-pbx-lb
+    hostname: pbx-lb.cloudcall.local
+    networks:
+      - pbx-cluster
+      - backend-network
+    ports:
+      - "5065:80"         # HTTP Load Balancer
+    volumes:
+      - ./nginx/pbx-lb.conf:/etc/nginx/nginx.conf
+    restart: unless-stopped
+    depends_on:
+      - pbx-node-1
+      - pbx-node-2
+
+networks:
+  pbx-cluster:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+  backend-network:
+    driver: bridge
+  external-network:
+    driver: bridge
+
+volumes:
+  pbx-1-recordings:
+    driver: local
+  pbx-1-storage:
+    driver: local
+  pbx-1-logs:
+    driver: local
+  pbx-2-recordings:
+    driver: local
+  pbx-2-storage:
+    driver: local
+  pbx-2-logs:
+    driver: local
+  redis-pbx-data:
+    driver: local
+  media-recordings:
+    driver: local
+  media-storage:
+    driver: local
+  sbc-logs:
+    driver: local

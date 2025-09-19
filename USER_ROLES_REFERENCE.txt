@@ -1,0 +1,222 @@
+===============================================
+CLOUD CALL SYSTEM - SAAS USER ROLES REFERENCE
+===============================================
+
+Last Updated: 2025-09-18
+Total Users: 9
+Database: SQLite (dev.db)
+Services Status: ✅ Running
+
+===============================================
+ROLE HIERARCHY & PERMISSIONS
+===============================================
+
+1. SUPERADMIN (Platform Owner)
+   - Full system access across all organizations
+   - Can manage all tenants, plans, and users
+   - Access to system-wide settings and billing
+   - Can create/delete any user or company
+
+2. COMPANY_ADMIN (Company Owner)
+   - Complete control over company resources
+   - Manage users, extensions, billing for their tenant
+   - Cannot access other companies' data
+   - Can create supervisors, agents, and users
+
+3. SUPERVISOR (Team Manager)
+   - Manages team members and operations
+   - Limited user creation (up to 50 users)
+   - Can view reports and manage calls
+   - Cannot modify billing or company settings
+
+4. AGENT (Call Center Agent)
+   - Handles customer calls and interactions
+   - Limited access to personal call history
+   - Cannot manage other users
+   - Basic extension access
+
+5. USER (Basic User)
+   - Basic access to personal features only
+   - Can make/receive calls on assigned extension
+   - Cannot manage anything beyond personal settings
+   - Minimal system access
+
+===============================================
+CURRENT USERS BY ROLE
+===============================================
+
+👑 SUPERADMIN (1 user):
+   • Super Admin <superadmin@cloudcall.com> ✅ Active
+     Login: superadmin@cloudcall.com / superadmin123
+     Tenant: Demo Company (demo.cloudcall.com)
+
+🏢 COMPANY_ADMIN (2 users):
+   • Admin User <admin@demo.cloudcall.com> ✅ Active
+     Login: admin@demo.cloudcall.com / admin123
+     Tenant: Demo Company (demo.cloudcall.com)
+
+   • ALAA Kowa <asadkowa2@gmail.com> ✅ Active
+     Tenant: Demo Company (demo.cloudcall.com)
+
+👥 SUPERVISOR (1 user):
+   • Team Supervisor <supervisor@demo.cloudcall.com> ✅ Active
+     Login: supervisor@demo.cloudcall.com / supervisor123
+     Tenant: Demo Company (demo.cloudcall.com)
+
+🎧 AGENT (4 users):
+   • Asaad Kowa <asadkowa@gmail.com> ❌ Inactive
+     Tenant: Demo Company (demo.cloudcall.com)
+
+   • Jane Smith <jane@demo.cloudcall.com> ✅ Active
+     Tenant: Demo Company (demo.cloudcall.com)
+
+   • John Doe <john@demo.cloudcall.com> ✅ Active
+     Login: john@demo.cloudcall.com / john123
+     Tenant: Demo Company (demo.cloudcall.com)
+
+   • Mike Johnson <mike@demo.cloudcall.com> ✅ Active
+     Tenant: Demo Company (demo.cloudcall.com)
+
+👤 USER (1 user):
+   • Regular User <user@demo.cloudcall.com> ✅ Active
+     Login: user@demo.cloudcall.com / user123
+     Tenant: Demo Company (demo.cloudcall.com)
+
+===============================================
+TEST LOGIN CREDENTIALS
+===============================================
+
+🔑 SUPERADMIN:
+   Email: superadmin@cloudcall.com
+   Password: superadmin123
+   Access: Full platform control
+
+🔑 COMPANY ADMIN:
+   Email: admin@demo.cloudcall.com
+   Password: admin123
+   Access: Company management
+
+🔑 SUPERVISOR:
+   Email: supervisor@demo.cloudcall.com
+   Password: supervisor123
+   Access: Team management
+
+🔑 AGENT:
+   Email: john@demo.cloudcall.com
+   Password: john123
+   Access: Call handling
+
+🔑 USER:
+   Email: user@demo.cloudcall.com
+   Password: user123
+   Access: Basic features
+
+===============================================
+ROLE-BASED UI FEATURES IMPLEMENTED
+===============================================
+
+✅ RoleGuard Component: Controls component visibility
+✅ FeatureGuard Component: Controls feature access
+✅ AccessBadge Component: Displays role/tenant info
+✅ useRoleAccess Hook: Permission management
+✅ Role-based Navigation: Dynamic menu items
+✅ Permission System: 17 different permissions
+✅ Tenant Isolation: Multi-tenant data security
+
+===============================================
+PERMISSIONS MATRIX
+===============================================
+
+Permission                | Super | Company | Super | Agent | User
+                          | Admin |  Admin  | visor |       |
+--------------------------|-------|---------|-------|-------|------
+canManageUsers           |   ✅   |    ✅    |   ✅   |   ❌   |  ❌
+canManageExtensions      |   ✅   |    ✅    |   ✅   |   ❌   |  ❌
+canViewBilling           |   ✅   |    ✅    |   ✅   |   ❌   |  ❌
+canManageBilling         |   ✅   |    ✅    |   ❌   |   ❌   |  ❌
+canViewCalls             |   ✅   |    ✅    |   ✅   |   ✅   |  ✅
+canManageCalls           |   ✅   |    ✅    |   ✅   |   ❌   |  ❌
+canViewReports           |   ✅   |    ✅    |   ✅   |   ❌   |  ❌
+canManageCompanies       |   ✅   |    ❌    |   ❌   |   ❌   |  ❌
+canManagePlans           |   ✅   |    ❌    |   ❌   |   ❌   |  ❌
+canViewPbx               |   ✅   |    ✅    |   ✅   |   ❌   |  ❌
+canManagePbx             |   ✅   |    ✅    |   ❌   |   ❌   |  ❌
+canAccessAllTenants      |   ✅   |    ❌    |   ❌   |   ❌   |  ❌
+canManageSettings        |   ✅   |    ✅    |   ❌   |   ❌   |  ❌
+canCreateUsers           |   ✅   |    ✅    |   ❌   |   ❌   |  ❌
+canDeleteUsers           |   ✅   |    ✅    |   ❌   |   ❌   |  ❌
+canAssignExtensions      |   ✅   |    ✅    |   ✅   |   ❌   |  ❌
+canViewFullCallHistory   |   ✅   |    ✅    |   ✅   |   ❌   |  ❌
+canExportData            |   ✅   |    ✅    |   ❌   |   ❌   |  ❌
+
+===============================================
+SYSTEM CONFIGURATION
+===============================================
+
+Frontend URL: http://localhos.t:3004
+Backend URL: http://localhost:3002
+Database: SQLite (backend/dev.db)
+Prisma Studio: http://localhost:5555
+
+CORS Origins Configured:
+- http://localhost:3000
+- http://localhost:3001
+- http://localhost:3002
+- http://localhost:3003
+- http://localhost:3004
+
+===============================================
+FILE LOCATIONS
+===============================================
+
+Frontend Components:
+- RoleGuard: frontend/src/components/common/RoleGuard.tsx
+- FeatureGuard: frontend/src/components/common/FeatureGuard.tsx
+- AccessBadge: frontend/src/components/common/AccessBadge.tsx
+- Layout: frontend/src/components/common/Layout.tsx
+
+Hooks & Utils:
+- useRoleAccess: frontend/src/hooks/useRoleAccess.ts
+- roleUtils: frontend/src/utils/roleUtils.ts
+
+Store:
+- authStore: frontend/src/store/authStore.ts
+
+Backend:
+- Database Schema: backend/prisma/schema.prisma
+- Environment: backend/.env
+
+===============================================
+MIGRATION NOTES
+===============================================
+
+- Migrated existing 'admin' roles to 'company_admin'
+- Kept existing 'agent' roles as 'agent'
+- Added new roles: superadmin, supervisor, user
+- All users belong to Demo Company tenant
+- Role-based UI components fully implemented
+- Permission system active and tested
+
+===============================================
+NEXT STEPS / TODO
+===============================================
+
+□ Test login with each role type
+□ Verify role-based navigation works
+□ Test permission-based features
+□ Add more tenants for multi-tenant testing
+□ Implement subscription-based feature gating
+□ Add role assignment UI for admins
+
+===============================================
+SUPPORT INFORMATION
+===============================================
+
+If you need to:
+1. Add new users: Use the Users page as superadmin/company_admin
+2. Change user roles: Update via Users page or database
+3. Add new permissions: Modify useRoleAccess.ts
+4. Add new roles: Update UserRole type in authStore.ts
+5. Reset database: Delete dev.db and restart services
+
+===============================================

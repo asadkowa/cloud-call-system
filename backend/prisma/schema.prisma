@@ -1,0 +1,289 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Tenant {
+  id               String   @id @default(uuid())
+  name             String
+  domain           String   @unique
+  planType         String
+  maxExtensions    Int      @default(10)
+  maxConcurrentCalls Int    @default(5)
+  features         String   @default("[]")
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  users            User[]
+  extensions       Extension[]
+  calls            Call[]
+  queues           Queue[]
+  subscription     Subscription?
+  usageRecords     UsageRecord[]
+  invoices         Invoice[]
+  payments         Payment[]
+
+  @@map("tenants")
+}
+
+model User {
+  id          String   @id @default(uuid())
+  tenantId    String
+  email       String   @unique
+  password    String
+  firstName   String
+  lastName    String
+  role        String
+  extensionId String?  @unique
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  extension   Extension? @relation(fields: [extensionId], references: [id])
+  agentQueues QueueAgent[]
+  calls       Call[]
+
+  @@map("users")
+}
+
+model Extension {
+  id          String   @id @default(uuid())
+  tenantId    String
+  number      String
+  displayName String
+  type        String
+  status      String   @default("active")
+  config      String   @default("{}")
+  sipPassword String?  // SIP authentication password
+  sipDomain   String?  // SIP domain
+  sipEnabled  Boolean  @default(true)
+  lastRegistered DateTime?
+  registrationStatus String @default("unregistered") // unregistered, registered, failed
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user        User?
+  calls       Call[]
+
+  @@unique([tenantId, number])
+  @@map("extensions")
+}
+
+model Call {
+  id           String    @id @default(uuid())
+  tenantId     String
+  fromNumber   String
+  toNumber     String
+  direction    String
+  status       String
+  startTime    DateTime  @default(now())
+  endTime      DateTime?
+  duration     Int?
+  recordingUrl String?
+  queueId      String?
+  agentId      String?
+  extensionId  String?
+
+  tenant      Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  queue       Queue?     @relation(fields: [queueId], references: [id])
+  agent       User?      @relation(fields: [agentId], references: [id])
+  extension   Extension? @relation(fields: [extensionId], references: [id])
+
+  @@map("calls")
+}
+
+model Queue {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  extension   String
+  strategy    String   @default("round_robin")
+  maxWaitTime Int      @default(300)
+  musicOnHold String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  agents      QueueAgent[]
+  calls       Call[]
+
+  @@unique([tenantId, extension])
+  @@map("queues")
+}
+
+model QueueAgent {
+  id           String   @id @default(uuid())
+  queueId      String
+  userId       String
+  skillLevel   Int      @default(1)
+  isLoggedIn   Boolean  @default(false)
+  currentStatus String  @default("offline")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  queue        Queue @relation(fields: [queueId], references: [id], onDelete: Cascade)
+  user         User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([queueId, userId])
+  @@map("queue_agents")
+}
+
+model Subscription {
+  id                String    @id @default(uuid())
+  tenantId          String    @unique
+  planId            String?   // Reference to SubscriptionPlan
+  stripeCustomerId  String?   @unique
+  stripeSubscriptionId String? @unique
+  planType          String    // 'basic', 'professional', 'enterprise' (legacy)
+  status            String    @default("active") // 'active', 'canceled', 'past_due', 'unpaid'
+  currentPeriodStart DateTime
+  currentPeriodEnd  DateTime
+  cancelAt          DateTime?
+  canceledAt        DateTime?
+  trialStart        DateTime?
+  trialEnd          DateTime?
+  priceId           String?   // Stripe price ID
+  quantity          Int       @default(1)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  tenant            Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan              SubscriptionPlan? @relation(fields: [planId], references: [id])
+  usageRecords      UsageRecord[]
+  invoices          Invoice[]
+
+  @@map("subscriptions")
+}
+
+model UsageRecord {
+  id             String   @id @default(uuid())
+  subscriptionId String
+  tenantId       String
+  recordType     String   // 'call_minutes', 'seat_count', 'sms_count'
+  quantity       Float    // Minutes used, seats active, etc.
+  unitAmount     Float?   // Cost per unit in cents
+  description    String?
+  recordDate     DateTime @default(now())
+  billingPeriod  String   // 'YYYY-MM' format
+  stripeUsageRecordId String?
+  processed      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("usage_records")
+}
+
+model Invoice {
+  id                String    @id @default(uuid())
+  subscriptionId    String?
+  tenantId          String
+  stripeInvoiceId   String?   @unique
+  invoiceNumber     String?   @unique
+  status            String    @default("draft") // 'draft', 'open', 'paid', 'void', 'uncollectible'
+  currency          String    @default("usd")
+  subtotal          Int       // Amount in cents
+  tax               Int       @default(0)
+  total             Int       // Amount in cents
+  amountPaid        Int       @default(0)
+  amountDue         Int       @default(0)
+  description       String?
+  dueDate           DateTime?
+  paidAt            DateTime?
+  voidedAt          DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  subscription      Subscription? @relation(fields: [subscriptionId], references: [id])
+  tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoiceItems      InvoiceItem[]
+  payments          Payment[]
+
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          String  @id @default(uuid())
+  invoiceId   String
+  description String
+  quantity    Float   @default(1)
+  unitAmount  Int     // Amount in cents
+  amount      Int     // Total amount in cents
+  priceId     String? // Stripe price ID
+  createdAt   DateTime @default(now())
+
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("invoice_items")
+}
+
+model Payment {
+  id                String    @id @default(uuid())
+  invoiceId         String?
+  tenantId          String
+  stripePaymentIntentId String? @unique
+  amount            Int       // Amount in cents
+  currency          String    @default("usd")
+  status            String    @default("pending") // 'pending', 'succeeded', 'failed', 'canceled'
+  paymentMethod     String?   // 'card', 'bank_transfer', 'paypal'
+  description       String?
+  paidAt            DateTime?
+  failedAt          DateTime?
+  failureReason     String?   // Reason for failure
+  refundedAmount    Int       @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  invoice           Invoice?  @relation(fields: [invoiceId], references: [id])
+  tenant            Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  retryAttempts     PaymentRetryAttempt[]
+
+  @@map("payments")
+}
+
+model SubscriptionPlan {
+  id               String   @id @default(uuid())
+  name             String   @unique
+  description      String?
+  monthlyPrice     Int      // Price in cents
+  yearlyPrice      Int      // Price in cents
+  features         String   @default("[]") // JSON array of features
+  maxExtensions    Int      @default(10)
+  maxConcurrentCalls Int    @default(5)
+  maxUsers         Int      @default(10)
+  isActive         Boolean  @default(true)
+  isCustom         Boolean  @default(false) // For admin-created plans
+  stripePriceIdMonthly String?
+  stripePriceIdYearly  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  subscriptions    Subscription[]
+
+  @@map("subscription_plans")
+}
+
+model PaymentRetryAttempt {
+  id            String    @id @default(uuid())
+  paymentId     String
+  attemptNumber Int
+  status        String    @default("pending") // 'pending', 'processing', 'succeeded', 'failed'
+  errorMessage  String?
+  scheduledAt   DateTime
+  processedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  payment       Payment   @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@map("payment_retry_attempts")
+}

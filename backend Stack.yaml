@@ -1,0 +1,6 @@
+Core PBX: FreeSWITCH 1.10+
+API Framework: FastAPI (Python)
+Database: PostgreSQL 15+
+Cache: Redis 7+
+Message Queue: RabbitMQ
+Container: Docker + Kubernetes
